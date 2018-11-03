@@ -1,0 +1,8 @@
+/.Python
+/bin
+/lib
+/include
+*.dmp
+*.dump
+*.csv
+/dump.sh
