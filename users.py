@@ -7,6 +7,7 @@ import unicodedata
 
 import click
 import mysql.connector
+import requests
 
 
 @click.group()
@@ -220,6 +221,69 @@ def match(ckb_path, forum_path, unknown_path):
         )
 
     print(len(unknown), "unknown entries")
+
+
+def _check_forum_error(rsp):
+    rsp.raise_for_status()
+    # FluxBB does not care about HTTP codes.
+    if "<title>Error / Forum CKB</title>" in rsp.text:
+        raise Exception("forum error: {}".format(rsp.text))
+
+
+class ForumClient:
+    def __init__(self, user, password):
+        self.session = requests.session()
+        # Login user
+        u = "http://www.kayak-brest.com/forum/login.php?action=in"
+        args = {"req_username": user, "req_password": password, "form_sent": "1"}
+        rsp = self.session.post(u, data=args)
+        _check_forum_error(rsp)
+
+    def get_user(self, user_id):
+        u = "http://www.kayak-brest.com/forum/profile.php?id={}".format(user_id)
+        rsp = self.session.get(u)
+        if rsp.status_code == 404:
+            return None
+        _check_forum_error(rsp)
+        return {"id": user_id}
+
+    def delete_user(self, user_id):
+        u = "http://www.kayak-brest.com/forum/profile.php?id={}".format(user_id)
+        referer = "http://www.kayak-brest.com/forum/profile.php?section=admin&id={}".format(
+            user_id
+        )
+        args = {"delete_user_comply": "Supprimer"}
+        headers = {"Referer": referer}
+        rsp = self.session.post(u, data=args, headers=headers)
+        try:
+            _check_forum_error(rsp)
+        except Exception:
+            if self.get_user(user_id):
+                raise
+            return False
+        return True
+
+
+def create_client():
+    user = os.environ.get("CKB_FORUM_USER")
+    if not user:
+        os.exit("error: CKB_FORUM_USER is not set")
+    password = os.environ.get("CKB_FORUM_PASSWORD")
+    if not password:
+        os.exit("error: CKB_FORUM_PASSWORD is not set")
+    return ForumClient(user, password)
+
+
+@cli.command("delete_users")
+@click.argument("user_id", nargs=-1)
+def delete_users(user_id):
+    user_ids = list(user_id)
+    forum = create_client()
+    for user_id in user_ids:
+        if forum.delete_user(user_id):
+            print("user deleted: {}".format(user_id))
+        else:
+            print("user does not exist: {}".format(user_id))
 
 
 if __name__ == "__main__":

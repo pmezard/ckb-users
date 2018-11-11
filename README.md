@@ -22,3 +22,11 @@ A set of command to handle CKB members and forum users.
         $ ./users.py match ckb.csv forum.csv --unknown-path unknown.csv
 
 Fill unknown.csv `delete` column and cleanup the forum.
+
+For the deletion part :
+
+- Define `CKB_FORUM_USER` and `CKB_FORUM_PASSWORD`
+- List identifiers of users to delete, one per line, in a file.
+- Delete the users:
+
+        $ cat user_ids.txt | xargs ./users.py delete_users
